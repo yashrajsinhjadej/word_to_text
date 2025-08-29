@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { Document, Packer, Paragraph, TextRun } = require('docx');
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -24,6 +23,10 @@ export default async function handler(req, res) {
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
     let allParagraphs = [];
 
+    // Import docx dynamically to avoid module resolution issues
+    const docx = require('docx');
+    const { Document, Packer, Paragraph, TextRun } = docx;
+
     for (const file of files) {
       const filePath = path.join(uploadDir, file);
       const imageBase64 = fs.readFileSync(filePath).toString("base64");
@@ -40,8 +43,8 @@ export default async function handler(req, res) {
 
       let extracted = result.response.text();
       console.log(`[OCR] Extracted: ${extracted.slice(0, 50)}...`);
-
-      // Format extracted text
+      
+      // Format extracted text into Word paragraphs
       const lines = extracted
         .split("\n")
         .map((l) => l.trim())
@@ -65,29 +68,28 @@ export default async function handler(req, res) {
       allParagraphs.push(new Paragraph("")); // spacing
     }
 
-    // Create Word doc
+    // Create Word document
     const doc = new Document({ sections: [{ children: allParagraphs }] });
     const buffer = await Packer.toBuffer(doc);
-
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=output.docx"
-    );
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    );
+    
+    // Return Word document
+    res.setHeader('Content-Disposition', 'attachment; filename=extracted_document.docx');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.send(buffer);
 
-    // Cleanup
+    // Cleanup uploaded files
     files.forEach((f) => {
       const filePath = path.join(uploadDir, f);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     });
+    
   } catch (err) {
     console.error("[FINALIZE] Error:", err);
-    res.status(500).json({ error: "❌ Error finalizing document" });
+    res.status(500).json({ 
+      error: "❌ Error processing images",
+      details: err.message 
+    });
   }
 }
