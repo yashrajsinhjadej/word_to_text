@@ -1,51 +1,43 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>WELCOME HEMATSINH JADEJA</title>
+  <title>OCR to Word</title>
 </head>
 <body>
-  <h2>Upload Images → Convert to Word</h2>
-  <h3></h3>
-
-  <form id="uploadForm" enctype="multipart/form-data">
-    <input type="file" name="file" accept="image/*" required />
+  <h2>Upload Images</h2>
+  <form id="uploadForm">
+    <input type="file" name="file" />
     <button type="submit">Upload</button>
   </form>
-
-  <button id="doneBtn">Done (Generate Word)</button>
-
-  <div id="status"></div>
+  <br/>
+  <button id="finalizeBtn">Finalize & Download Word</button>
 
   <script>
     const uploadForm = document.getElementById("uploadForm");
-    const statusDiv = document.getElementById("status");
-    const doneBtn = document.getElementById("doneBtn");
+    const finalizeBtn = document.getElementById("finalizeBtn");
 
     uploadForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const formData = new FormData(uploadForm);
-
-      const res = await fetch("/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await res.json();
-  statusDiv.innerHTML += `<p>✅ Uploaded: ${data.file}</p>`;
+      alert(JSON.stringify(data));
     });
 
-    doneBtn.addEventListener("click", async () => {
-      const res = await fetch("/finalize");
+    finalizeBtn.addEventListener("click", async () => {
+      const res = await fetch("/api/finalize");
+      if (!res.ok) {
+        alert("Error finalizing document");
+        return;
+      }
       const blob = await res.blob();
-
-      // Trigger download
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "output.docx";
+      document.body.appendChild(a);
       a.click();
-
-  statusDiv.innerHTML += `<p>📄 Word file generated</p>`;
+      a.remove();
     });
   </script>
 </body>
