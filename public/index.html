@@ -42,7 +42,7 @@
 
       const formData = new FormData(uploadForm);
       try {
-        const res = await fetch("/upload", { method: "POST", body: formData });
+  const res = await fetch("/api/upload", { method: "POST", body: formData });
         const data = await res.json();
         
         loader.style.display = "none"; // hide loader
@@ -62,7 +62,7 @@
 
     finalizeBtn.addEventListener("click", async () => {
       message.textContent = "";
-      const res = await fetch("/finalize");
+  const res = await fetch("/api/finalize");
       if (!res.ok) {
         message.textContent = "❌ Error finalizing document";
         message.style.color = "red";

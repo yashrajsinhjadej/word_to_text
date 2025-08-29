@@ -45,16 +45,16 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-
-// Upload endpoint
-app.post("/upload", upload.single("file"), (req, res) => {
+❌ Upload error: Unexpected token 'T', "The page c"... is not valid JSON
+// Upload endpoint (Vercel: /api/upload)
+app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   console.log(`[UPLOAD] ${req.file.originalname}`);
   res.json({ message: "✅ Uploaded", file: req.file.filename });
 });
 
-// Finalize endpoint
-app.get("/finalize", async (req, res, next) => {
+// Finalize endpoint (Vercel: /api/finalize)
+app.get("/api/finalize", async (req, res, next) => {
   try {
     const files = fs.readdirSync(uploadDir);
     if (!files.length) return res.status(400).send("❌ No files uploaded yet.");
@@ -125,8 +125,9 @@ app.get("/finalize", async (req, res, next) => {
 });
 
 
-// 404 handler
-app.use('*', (req, res) => {
+
+// 404 handler (for API routes only)
+app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'API route not found'
