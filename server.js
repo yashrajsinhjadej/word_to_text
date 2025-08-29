@@ -10,9 +10,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Ensure uploads folder exists
-const uploadDir = path.join(__dirname, "uploads");
+const uploadDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+  fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 // Multer setup
@@ -23,8 +23,18 @@ const upload = multer({ dest: uploadDir });
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
 // Gemini init
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+// Health check route (for Vercel: /api/health)
+app.get('/api/health', (req, res) => {
+  res.json({
+    message: 'Word-to-Text API Server is running!',
+    status: 'Active',
+    timestamp: new Date().toISOString()
+  });
+});
 
 
 // Health check route
