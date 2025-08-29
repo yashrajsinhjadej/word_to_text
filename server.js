@@ -45,7 +45,6 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-❌ Upload error: Unexpected token 'T', "The page c"... is not valid JSON
 // Upload endpoint (Vercel: /api/upload)
 app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -143,7 +142,6 @@ app.use((error, req, res, next) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`🚀 Word-to-Text server running on port ${port}`);
-  console.log(`📍 Server URL: http://localhost:${port}`);
-});
+
+// For Vercel: export the app as a serverless function handler
+module.exports = app;
