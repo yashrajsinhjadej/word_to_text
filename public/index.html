@@ -2,6 +2,19 @@
 <html>
 <head>
   <title>OCR to Word</title>
+  <style>
+    #message {
+      margin-top: 10px;
+      font-weight: bold;
+      color: green;
+    }
+    #loader {
+      display: none;
+      margin-top: 10px;
+      color: blue;
+      font-style: italic;
+    }
+  </style>
 </head>
 <body>
   <h2>Upload Images</h2>
@@ -9,25 +22,50 @@
     <input type="file" name="file" />
     <button type="submit">Upload</button>
   </form>
+  
+  <div id="loader">⏳ Uploading... please wait</div>
+  <div id="message"></div>
+
   <br/>
   <button id="finalizeBtn">Finalize & Download Word</button>
 
   <script>
     const uploadForm = document.getElementById("uploadForm");
     const finalizeBtn = document.getElementById("finalizeBtn");
+    const loader = document.getElementById("loader");
+    const message = document.getElementById("message");
 
     uploadForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      message.textContent = "";
+      loader.style.display = "block"; // show loader
+
       const formData = new FormData(uploadForm);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      alert(JSON.stringify(data));
+      try {
+        const res = await fetch("/upload", { method: "POST", body: formData });
+        const data = await res.json();
+        
+        loader.style.display = "none"; // hide loader
+        if (res.ok) {
+          message.textContent = "✅ File uploaded successfully!";
+          message.style.color = "green";
+        } else {
+          message.textContent = "❌ Upload failed: " + (data.error || "Unknown error");
+          message.style.color = "red";
+        }
+      } catch (err) {
+        loader.style.display = "none";
+        message.textContent = "❌ Upload error: " + err.message;
+        message.style.color = "red";
+      }
     });
 
     finalizeBtn.addEventListener("click", async () => {
-      const res = await fetch("/api/finalize");
+      message.textContent = "";
+      const res = await fetch("/finalize");
       if (!res.ok) {
-        alert("Error finalizing document");
+        message.textContent = "❌ Error finalizing document";
+        message.style.color = "red";
         return;
       }
       const blob = await res.blob();
@@ -38,6 +76,8 @@
       document.body.appendChild(a);
       a.click();
       a.remove();
+      message.textContent = "📄 Word document downloaded!";
+      message.style.color = "green";
     });
   </script>
 </body>
