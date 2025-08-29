@@ -4,11 +4,11 @@
   "description": "Convert images to Word documents using AI OCR",
   "scripts": {
     "dev": "vercel dev",
-    "build": "echo 'Build complete'"
+    "build": "npm install"
   },
   "dependencies": {
     "@google/generative-ai": "^0.7.1",
-    "docx": "^8.2.2",
+    "docx": "8.2.2",
     "multer": "^1.4.5-lts.1"
   },
   "engines": {
