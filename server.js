@@ -16,8 +16,8 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 // Multer setup
 const upload = multer({ dest: uploadDir });
 
-// Serve static frontend
-app.use(express.static(path.join(__dirname, "public")));
+// Serve static frontend (handled by Vercel in production)
+// app.use(express.static(path.join(__dirname, "public")));
 
 // Gemini init
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
