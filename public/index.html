@@ -1,95 +1,359 @@
-require("dotenv").config();
-const express = require("express");
-const multer = require("multer");
-const fs = require("fs");
-const path = require("path");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { Document, Packer, Paragraph, TextRun } = require("docx");
-
-const app = express();
-const port = process.env.PORT || 3000;
-
-// Ensure uploads folder exists
-const uploadDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
-
-// Multer setup
-const upload = multer({ dest: uploadDir });
-
-// Serve static frontend
-app.use(express.static(path.join(__dirname, "public")));
-
-// Gemini init
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-
-// Upload endpoint
-app.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  console.log(`[UPLOAD] ${req.file.originalname}`);
-  res.json({ message: "✅ Uploaded", file: req.file.filename });
-});
-
-// Finalize endpoint
-app.get("/finalize", async (req, res) => {
-  try {
-    const files = fs.readdirSync(uploadDir);
-    if (!files.length) return res.status(400).send("❌ No files uploaded yet.");
-
-    let allParagraphs = [];
-
-    for (const file of files) {
-      const filePath = path.join(uploadDir, file);
-      const imageBase64 = fs.readFileSync(filePath).toString("base64");
-
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await model.generateContent([
-        { inlineData: { data: imageBase64, mimeType: "image/jpeg" } },
-        { text: "Extract text from this image and keep formatting/line breaks." }
-      ]);
-
-      let extracted = result.response.text();
-      console.log(`[OCR] Extracted: ${extracted.slice(0, 50)}...`);
-
-      // Format extracted text
-      const lines = extracted.split("\n").map(l => l.trim()).filter(Boolean);
-      for (const line of lines) {
-        if (line.includes(":")) {
-          const [key, ...rest] = line.split(":");
-          allParagraphs.push(
-            new Paragraph({
-              children: [
-                new TextRun({ text: key + ":", bold: true }),
-                new TextRun(" " + rest.join(":").trim())
-              ]
-            })
-          );
-        } else {
-          allParagraphs.push(new Paragraph(line));
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Debugger</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
         }
-      }
-      allParagraphs.push(new Paragraph("")); // spacing
-    }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .log-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        input[type="text"] {
+            width: 300px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        .tab-container {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            border-bottom-color: #007bff;
+            background: #f8f9fa;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 API Debugger</h1>
+    
+    <div class="tab-container">
+        <div class="tab active" onclick="switchTab('health')">Health Check</div>
+        <div class="tab" onclick="switchTab('process')">Process API Test</div>
+        <div class="tab" onclick="switchTab('upload')">Upload Test</div>
+    </div>
 
-    // Create Word doc
-    const doc = new Document({ sections: [{ children: allParagraphs }] });
-    const buffer = await Packer.toBuffer(doc);
+    <!-- Health Check Tab -->
+    <div id="health" class="tab-content active">
+        <div class="container">
+            <h2>🏥 Health Check</h2>
+            <p>Test if your APIs are reachable and configured properly:</p>
+            <button class="button" onclick="testHealth()">Test Health</button>
+            <button class="button" onclick="testProcessEndpoint()">Test Process Endpoint</button>
+            <div id="health-result"></div>
+        </div>
+    </div>
 
-    res.setHeader("Content-Disposition", "attachment; filename=output.docx");
-    res.setHeader("Content-Type",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    );
-    res.send(buffer);
+    <!-- Process API Test Tab -->
+    <div id="process" class="tab-content">
+        <div class="container">
+            <h2>⚙️ Process API Test</h2>
+            <p>Test the process API with your batch ID:</p>
+            <input type="text" id="batchId" placeholder="Enter Batch ID (e.g., 1756568682237)" value="1756568682237">
+            <button class="button" onclick="testProcess()">Test Process API</button>
+            <div id="process-result"></div>
+        </div>
+    </div>
 
-    // Cleanup
-    files.forEach(f => fs.unlinkSync(path.join(uploadDir, f)));
-  } catch (err) {
-    console.error("[FINALIZE] Error:", err);
-    res.status(500).send("❌ Error finalizing document");
-  }
-});
+    <!-- Upload Test Tab -->
+    <div id="upload" class="tab-content">
+        <div class="container">
+            <h2>📤 Upload Test</h2>
+            <p>Test file upload functionality:</p>
+            <input type="file" id="fileInput" multiple accept="image/*">
+            <button class="button" onclick="testUpload()">Test Upload</button>
+            <div id="upload-result"></div>
+        </div>
+    </div>
 
-app.listen(port, () => {
-  console.log(`🚀 Server running on http://localhost:${port}`);
-});
+    <div class="container">
+        <h3>📋 Debug Logs</h3>
+        <button class="button" onclick="clearLogs()">Clear Logs</button>
+        <div id="logs" class="log-container"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString();
+            const logElement = document.getElementById('logs');
+            const colorMap = {
+                'info': '#333',
+                'success': '#28a745',
+                'error': '#dc3545',
+                'warning': '#ffc107'
+            };
+            
+            logElement.innerHTML += `<div style="color: ${colorMap[type]}; margin: 2px 0;">
+                [${timestamp}] ${message}
+            </div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        async function testHealth() {
+            log('Testing health endpoint...', 'info');
+            const resultDiv = document.getElementById('health-result');
+            
+            try {
+                const response = await fetch('/api/health', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                log(`Health check response status: ${response.status}`, 'info');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('Health check successful', 'success');
+                    resultDiv.innerHTML = `<div class="success">✅ Health Check Passed<br>
+                        MongoDB: ${data.mongodb ? '✅' : '❌'}<br>
+                        Google API: ${data.google_api ? '✅' : '❌'}<br>
+                        Timestamp: ${data.timestamp}</div>`;
+                } else {
+                    const errorText = await response.text();
+                    log(`Health check failed: ${errorText}`, 'error');
+                    resultDiv.innerHTML = `<div class="error">❌ Health Check Failed<br>${errorText}</div>`;
+                }
+            } catch (error) {
+                log(`Health check error: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testProcessEndpoint() {
+            log('Testing process endpoint accessibility...', 'info');
+            const resultDiv = document.getElementById('health-result');
+            
+            try {
+                // Test with a dummy batch ID to see if endpoint responds
+                const response = await fetch('/api/process?batchId=test', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                log(`Process endpoint response status: ${response.status}`, 'info');
+                
+                const responseText = await response.text();
+                log(`Process endpoint response preview: ${responseText.substring(0, 100)}...`, 'info');
+                
+                try {
+                    const data = JSON.parse(responseText);
+                    resultDiv.innerHTML += `<div class="success">✅ Process Endpoint Accessible<br>
+                        Status: ${response.status}<br>
+                        Response: ${JSON.stringify(data, null, 2)}</div>`;
+                } catch (parseError) {
+                    log('Process endpoint returned non-JSON response', 'warning');
+                    resultDiv.innerHTML += `<div class="error">⚠️ Process endpoint returned HTML/non-JSON:<br>
+                        <pre>${responseText.substring(0, 200)}...</pre></div>`;
+                }
+            } catch (error) {
+                log(`Process endpoint test error: ${error.message}`, 'error');
+                resultDiv.innerHTML += `<div class="error">❌ Process Endpoint Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testProcess() {
+            const batchId = document.getElementById('batchId').value.trim();
+            const resultDiv = document.getElementById('process-result');
+            
+            if (!batchId) {
+                resultDiv.innerHTML = '<div class="error">❌ Please enter a batch ID</div>';
+                return;
+            }
+
+            log(`Testing process API with batchId: ${batchId}`, 'info');
+            resultDiv.innerHTML = '<div>🔄 Processing... This may take a while.</div>';
+
+            try {
+                const response = await fetch(`/api/process?batchId=${encodeURIComponent(batchId)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json, application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    }
+                });
+
+                log(`Process API response status: ${response.status}`, 'info');
+                log(`Process API response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'info');
+
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+                        // It's a Word document
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `extracted_document_${batchId}.docx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        
+                        log('Document downloaded successfully', 'success');
+                        resultDiv.innerHTML = '<div class="success">✅ Document processed and downloaded successfully!</div>';
+                    } else {
+                        // Try to parse as JSON
+                        const responseText = await response.text();
+                        try {
+                            const data = JSON.parse(responseText);
+                            log('Process API returned JSON response', 'success');
+                            resultDiv.innerHTML = `<div class="success">✅ Response: ${JSON.stringify(data, null, 2)}</div>`;
+                        } catch (parseError) {
+                            log('Process API returned non-JSON response', 'error');
+                            resultDiv.innerHTML = `<div class="error">❌ Unexpected response format:<br><pre>${responseText.substring(0, 500)}...</pre></div>`;
+                        }
+                    }
+                } else {
+                    const errorText = await response.text();
+                    log(`Process API error: ${errorText}`, 'error');
+                    
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        resultDiv.innerHTML = `<div class="error">❌ API Error (${response.status}):<br>${errorData.error}<br>Details: ${errorData.details || 'None'}</div>`;
+                    } catch (parseError) {
+                        resultDiv.innerHTML = `<div class="error">❌ API Error (${response.status}):<br><pre>${errorText}</pre></div>`;
+                    }
+                }
+            } catch (error) {
+                log(`Process API network error: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const resultDiv = document.getElementById('upload-result');
+            
+            if (!fileInput.files.length) {
+                resultDiv.innerHTML = '<div class="error">❌ Please select files to upload</div>';
+                return;
+            }
+
+            log(`Testing upload with ${fileInput.files.length} files`, 'info');
+            resultDiv.innerHTML = '<div>🔄 Uploading files...</div>';
+
+            try {
+                const formData = new FormData();
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    formData.append('files', fileInput.files[i]);
+                }
+
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                log(`Upload response status: ${response.status}`, 'info');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    log('Upload successful', 'success');
+                    resultDiv.innerHTML = `<div class="success">✅ Upload Successful<br>
+                        Batch ID: ${data.batchId}<br>
+                        Files: ${data.filesCount}</div>`;
+                    
+                    // Auto-fill the batch ID in process tab
+                    document.getElementById('batchId').value = data.batchId;
+                } else {
+                    const errorText = await response.text();
+                    log(`Upload failed: ${errorText}`, 'error');
+                    resultDiv.innerHTML = `<div class="error">❌ Upload Failed:<br><pre>${errorText}</pre></div>`;
+                }
+            } catch (error) {
+                log(`Upload network error: ${error.message}`, 'error');
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+
+        // Log initial page load
+        log('Debug page loaded', 'info');
+    </script>
+</body>
+</html>
