@@ -1,20 +1,18 @@
 {
   "name": "word-to-text",
   "version": "1.0.0",
-  "main": "server.js",
+  "description": "Convert images to Word documents using AI OCR",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "dev": "vercel dev",
+    "build": "npm install"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "docx": "^9.5.1",
-    "dotenv": "^17.2.1",
-    "express": "^5.1.0",
-    "multer": "^2.0.2"
+    "@google/generative-ai": "^0.7.1",
+    "docx": "^8.2.2",
+    "mongodb": "^6.0.0",
+    "mongoose": "^8.18.0"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
