@@ -14,44 +14,46 @@ async function connectToDatabase() {
   return client;
 }
 
-// Improved docx module loading with multiple fallbacks
-async function loadDocxModule() {
-  console.log('[DOCX] Starting module load...');
+// Simple direct docx loading since package is confirmed installed
+function loadDocxModule() {
+  console.log('[DOCX] Loading docx module directly...');
   
-  const possiblePaths = [
-    'docx',
-    'docx/build/index.js',
-    'docx/build/index.cjs',
-    'docx/lib/index.js',
-    'docx/dist/index.js',
-    'docx/build'
-  ];
-
-  for (const path of possiblePaths) {
-    try {
-      console.log(`[DOCX] Trying to load: ${path}`);
-      const docx = require(path);
+  try {
+    const docx = require('docx');
+    console.log(`[DOCX] Raw docx module loaded`);
+    console.log(`[DOCX] Available exports: ${Object.keys(docx).slice(0, 20).join(', ')}`);
+    
+    // Check what we actually got
+    const hasDocument = !!docx.Document;
+    const hasPacker = !!docx.Packer;
+    const hasParagraph = !!docx.Paragraph;
+    const hasTextRun = !!docx.TextRun;
+    
+    console.log(`[DOCX] Export check - Document: ${hasDocument}, Packer: ${hasPacker}, Paragraph: ${hasParagraph}, TextRun: ${hasTextRun}`);
+    
+    if (!hasDocument || !hasPacker || !hasParagraph || !hasTextRun) {
+      console.log(`[DOCX] Missing exports, trying destructuring...`);
       
-      // Verify we have the required exports
-      if (docx.Document && docx.Packer && docx.Paragraph && docx.TextRun) {
-        console.log(`[DOCX] ✅ Successfully loaded from: ${path}`);
-        console.log(`[DOCX] Available exports: ${Object.keys(docx).slice(0, 10).join(', ')}...`);
-        return {
-          Document: docx.Document,
-          Packer: docx.Packer,
-          Paragraph: docx.Paragraph,
-          TextRun: docx.TextRun
-        };
-      } else {
-        console.log(`[DOCX] ❌ Loaded ${path} but missing required exports`);
-        console.log(`[DOCX] Available: ${Object.keys(docx).slice(0, 10).join(', ')}`);
-      }
-    } catch (error) {
-      console.log(`[DOCX] ❌ Failed to load ${path}: ${error.message}`);
+      // Log actual exports for debugging
+      console.log(`[DOCX] Actual exports type:`, typeof docx);
+      console.log(`[DOCX] Is array:`, Array.isArray(docx));
+      console.log(`[DOCX] Constructor:`, docx.constructor.name);
+      
+      throw new Error(`Missing required exports. Available: ${Object.keys(docx).join(', ')}`);
     }
+    
+    console.log(`[DOCX] ✅ All required exports found`);
+    return {
+      Document: docx.Document,
+      Packer: docx.Packer,
+      Paragraph: docx.Paragraph,
+      TextRun: docx.TextRun
+    };
+    
+  } catch (error) {
+    console.error(`[DOCX] ❌ Failed to load docx:`, error);
+    throw new Error(`Could not load docx module: ${error.message}`);
   }
-  
-  throw new Error('Could not load docx module with required exports from any path');
 }
 
 export default async function handler(req, res) {
@@ -109,7 +111,7 @@ export default async function handler(req, res) {
     let Document, Packer, Paragraph, TextRun;
     
     try {
-      const docxModule = await loadDocxModule();
+      const docxModule = loadDocxModule();
       Document = docxModule.Document;
       Packer = docxModule.Packer;
       Paragraph = docxModule.Paragraph;
