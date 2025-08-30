@@ -14,6 +14,46 @@ async function connectToDatabase() {
   return client;
 }
 
+// Improved docx module loading with multiple fallbacks
+async function loadDocxModule() {
+  console.log('[DOCX] Starting module load...');
+  
+  const possiblePaths = [
+    'docx',
+    'docx/build/index.js',
+    'docx/build/index.cjs',
+    'docx/lib/index.js',
+    'docx/dist/index.js',
+    'docx/build'
+  ];
+
+  for (const path of possiblePaths) {
+    try {
+      console.log(`[DOCX] Trying to load: ${path}`);
+      const docx = require(path);
+      
+      // Verify we have the required exports
+      if (docx.Document && docx.Packer && docx.Paragraph && docx.TextRun) {
+        console.log(`[DOCX] ✅ Successfully loaded from: ${path}`);
+        console.log(`[DOCX] Available exports: ${Object.keys(docx).slice(0, 10).join(', ')}...`);
+        return {
+          Document: docx.Document,
+          Packer: docx.Packer,
+          Paragraph: docx.Paragraph,
+          TextRun: docx.TextRun
+        };
+      } else {
+        console.log(`[DOCX] ❌ Loaded ${path} but missing required exports`);
+        console.log(`[DOCX] Available: ${Object.keys(docx).slice(0, 10).join(', ')}`);
+      }
+    } catch (error) {
+      console.log(`[DOCX] ❌ Failed to load ${path}: ${error.message}`);
+    }
+  }
+  
+  throw new Error('Could not load docx module with required exports from any path');
+}
+
 export default async function handler(req, res) {
   console.log(`[${new Date().toISOString()}] Request received: ${req.method} ${req.url}`);
   
@@ -33,8 +73,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('[PROCESS] Starting processing...');
+    console.log('[PROCESS] 🚀 Starting processing...');
     console.log('[PROCESS] Query params:', req.query);
+    console.log('[PROCESS] Environment:', {
+      nodeVersion: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      cwd: process.cwd()
+    });
 
     const { batchId } = req.query;
     
@@ -43,7 +89,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Batch ID is required' });
     }
 
-    console.log(`[PROCESS] Processing batchId: ${batchId}`);
+    console.log(`[PROCESS] 📋 Processing batchId: ${batchId}`);
 
     // Check required environment variables
     if (!process.env.MONGODB_URI) {
@@ -56,63 +102,91 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "❌ Missing Google API key" });
     }
 
-    console.log('[PROCESS] Environment variables validated');
+    console.log('[PROCESS] ✅ Environment variables validated');
+
+    // Load docx module with improved error handling
+    console.log('[PROCESS] 📦 Loading docx module...');
+    let Document, Packer, Paragraph, TextRun;
+    
+    try {
+      const docxModule = await loadDocxModule();
+      Document = docxModule.Document;
+      Packer = docxModule.Packer;
+      Paragraph = docxModule.Paragraph;
+      TextRun = docxModule.TextRun;
+      
+      console.log('[PROCESS] ✅ docx module loaded successfully');
+      
+    } catch (docxError) {
+      console.error('[ERROR] 💥 docx module load failed:', docxError);
+      console.error('[ERROR] Error stack:', docxError.stack);
+      
+      return res.status(500).json({ 
+        error: "❌ Word document module not available", 
+        details: docxError.message,
+        debug: {
+          nodeVersion: process.version,
+          platform: process.platform,
+          arch: process.arch,
+          cwd: process.cwd(),
+          nodePath: process.env.NODE_PATH,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
 
     // Connect to MongoDB
-    console.log('[PROCESS] Connecting to MongoDB...');
+    console.log('[PROCESS] 🗄️ Connecting to MongoDB...');
     const client = await connectToDatabase();
     const db = client.db('word_to_text');
     const collection = db.collection('images');
-    console.log('[PROCESS] MongoDB connected successfully');
+    console.log('[PROCESS] ✅ MongoDB connected successfully');
 
     // Retrieve images for this batch
-    console.log(`[PROCESS] Querying images for batchId: ${batchId}`);
+    console.log(`[PROCESS] 🔍 Querying images for batchId: ${batchId}`);
     const images = await collection.find({ 
       batchId: batchId,
       processed: false 
     }).sort({ order: 1 }).toArray();
 
-    console.log(`[PROCESS] Found ${images.length} images for batch ${batchId}`);
+    console.log(`[PROCESS] 📸 Found ${images.length} images for batch ${batchId}`);
 
     if (images.length === 0) {
       console.log('[ERROR] No unprocessed images found');
-      // Check if there are any images at all for this batch
       const totalImages = await collection.countDocuments({ batchId: batchId });
-      console.log(`[INFO] Total images in batch: ${totalImages}`);
+      const processedImages = await collection.countDocuments({ batchId: batchId, processed: true });
+      
+      console.log(`[INFO] Total images in batch: ${totalImages}, Processed: ${processedImages}`);
       
       if (totalImages === 0) {
-        return res.status(400).json({ error: 'No images found for this batch ID' });
+        return res.status(400).json({ 
+          error: 'No images found for this batch ID',
+          batchId: batchId,
+          debug: {
+            totalInBatch: totalImages,
+            processedInBatch: processedImages
+          }
+        });
       } else {
-        return res.status(400).json({ error: 'All images in this batch have already been processed' });
+        return res.status(400).json({ 
+          error: 'All images in this batch have already been processed',
+          batchId: batchId,
+          debug: {
+            totalInBatch: totalImages,
+            processedInBatch: processedImages
+          }
+        });
       }
     }
 
     // Initialize Google AI
-    console.log('[PROCESS] Initializing Google AI...');
+    console.log('[PROCESS] 🤖 Initializing Google AI...');
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
     let allParagraphs = [];
 
-    // Load docx module
-    console.log('[PROCESS] Loading docx module...');
-    let Document, Packer, Paragraph, TextRun;
-    try {
-      const docx = require('docx');
-      Document = docx.Document;
-      Packer = docx.Packer;
-      Paragraph = docx.Paragraph;
-      TextRun = docx.TextRun;
-      console.log('[PROCESS] docx module loaded successfully');
-    } catch (docxError) {
-      console.error('[ERROR] docx module load failed:', docxError);
-      return res.status(500).json({ 
-        error: "❌ Word document module not available", 
-        details: docxError.message 
-      });
-    }
-
     // Process each image
     for (const [index, imageDoc] of images.entries()) {
-      console.log(`[PROCESS] Processing image ${index + 1}/${images.length}: ${imageDoc.filename}`);
+      console.log(`[PROCESS] 🖼️ Processing image ${index + 1}/${images.length}: ${imageDoc.filename}`);
       
       try {
         // Validate image data
@@ -128,9 +202,9 @@ export default async function handler(req, res) {
 
         // Use the base64 data directly from MongoDB
         const imageBase64 = imageDoc.data;
-        console.log(`[PROCESS] Image data length: ${imageBase64.length} characters`);
+        console.log(`[PROCESS] 📊 Image data length: ${imageBase64.length} characters`);
 
-        console.log(`[PROCESS] Calling Gemini API for image: ${imageDoc.filename}`);
+        console.log(`[PROCESS] 🔮 Calling Gemini API for image: ${imageDoc.filename}`);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const result = await model.generateContent([
           {
@@ -140,12 +214,12 @@ export default async function handler(req, res) {
             },
           },
           {
-            text: "Extract text from this image and keep formatting/line breaks.",
+            text: "Extract text from this image and keep formatting/line breaks. Convert any handwritten text to typed text.",
           },
         ]);
 
         let extracted = result.response.text();
-        console.log(`[PROCESS] OCR extracted from ${imageDoc.filename}: ${extracted.slice(0, 100)}...`);
+        console.log(`[PROCESS] ✅ OCR extracted from ${imageDoc.filename}: ${extracted.slice(0, 100)}...`);
 
         // Add page header for each image
         allParagraphs.push(
@@ -158,6 +232,9 @@ export default async function handler(req, res) {
                 color: "2E74B5"
               }),
             ],
+            spacing: {
+              after: 200,
+            },
           })
         );
         allParagraphs.push(new Paragraph("")); // spacing
@@ -169,18 +246,30 @@ export default async function handler(req, res) {
           .filter(Boolean);
 
         for (const line of lines) {
-          if (line.includes(":")) {
+          if (line.includes(":") && line.split(":")[0].length < 50) {
+            // Treat as label:value pair if the part before colon is short
             const [key, ...rest] = line.split(":");
             allParagraphs.push(
               new Paragraph({
                 children: [
-                  new TextRun({ text: key + ":", bold: true }),
+                  new TextRun({ text: key.trim() + ":", bold: true }),
                   new TextRun(" " + rest.join(":").trim()),
                 ],
+                spacing: {
+                  after: 120,
+                },
               })
             );
           } else {
-            allParagraphs.push(new Paragraph(line));
+            // Regular paragraph
+            allParagraphs.push(
+              new Paragraph({
+                children: [new TextRun(line)],
+                spacing: {
+                  after: 120,
+                },
+              })
+            );
           }
         }
         
@@ -189,7 +278,7 @@ export default async function handler(req, res) {
         allParagraphs.push(new Paragraph(""));
 
       } catch (imageError) {
-        console.error(`[ERROR] Failed to process image ${imageDoc.filename}:`, imageError);
+        console.error(`[ERROR] 💥 Failed to process image ${imageDoc.filename}:`, imageError);
         // Continue with other images instead of failing completely
         allParagraphs.push(
           new Paragraph({
@@ -201,37 +290,51 @@ export default async function handler(req, res) {
             ],
           })
         );
+        allParagraphs.push(new Paragraph(""));
       }
     }
 
-    console.log('[PROCESS] Creating Word document...');
+    console.log('[PROCESS] 📄 Creating Word document...');
+    console.log(`[PROCESS] Total paragraphs to include: ${allParagraphs.length}`);
     
     // Create Word document with all pages
     const doc = new Document({ 
       sections: [{ 
-        properties: {},
+        properties: {
+          page: {
+            margin: {
+              top: 1440,    // 1 inch
+              right: 1440,  // 1 inch  
+              bottom: 1440, // 1 inch
+              left: 1440,   // 1 inch
+            },
+          },
+        },
         children: allParagraphs 
       }] 
     });
     
-    console.log('[PROCESS] Generating document buffer...');
+    console.log('[PROCESS] 🔄 Generating document buffer...');
     const buffer = await Packer.toBuffer(doc);
-    console.log(`[PROCESS] Document buffer created, size: ${buffer.length} bytes`);
+    console.log(`[PROCESS] ✅ Document buffer created, size: ${buffer.length} bytes`);
     
     // Mark images as processed
-    console.log('[PROCESS] Marking images as processed...');
+    console.log('[PROCESS] 🏷️ Marking images as processed...');
     const updateResult = await collection.updateMany(
       { batchId: batchId },
       { $set: { processed: true, processedAt: new Date() } }
     );
-    console.log(`[PROCESS] Updated ${updateResult.modifiedCount} documents as processed`);
+    console.log(`[PROCESS] ✅ Updated ${updateResult.modifiedCount} documents as processed`);
 
     // Return Word document
     res.setHeader('Content-Disposition', `attachment; filename=extracted_document_${batchId}.docx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Length', buffer.length.toString());
+    
+    console.log('[PROCESS] 🎉 Sending Word document to client...');
     res.send(buffer);
 
-    console.log('[PROCESS] Process completed successfully');
+    console.log('[PROCESS] ✅ Process completed successfully');
 
     // Clean up old processed images (older than 1 hour) - do this async
     setTimeout(async () => {
@@ -241,14 +344,14 @@ export default async function handler(req, res) {
           processed: true,
           processedAt: { $lt: oneHourAgo }
         });
-        console.log(`[CLEANUP] Deleted ${deleteResult.deletedCount} old processed images`);
+        console.log(`[CLEANUP] 🧹 Deleted ${deleteResult.deletedCount} old processed images`);
       } catch (cleanupError) {
         console.error('[CLEANUP] Error during cleanup:', cleanupError);
       }
     }, 1000);
 
   } catch (err) {
-    console.error("[ERROR] Detailed error:", err);
+    console.error("[ERROR] 💥 Detailed error:", err);
     console.error("[ERROR] Error stack:", err.stack);
     
     // Send more detailed error information
@@ -256,7 +359,10 @@ export default async function handler(req, res) {
       error: "❌ Error processing images",
       details: err.message,
       type: err.constructor.name,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      nodeVersion: process.version,
+      platform: process.platform,
+      batchId: req.query.batchId
     });
   }
 }
@@ -264,7 +370,6 @@ export default async function handler(req, res) {
 export const config = {
   api: {
     bodyParser: false,
-    // Add timeout configuration
     externalResolver: true,
   },
 };
