@@ -150,19 +150,28 @@
             transform: scale(1.1);
         }
 
+        .button-container {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
         .convert-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 15px 40px;
-            font-size: 1.2rem;
+            padding: 15px 30px;
+            font-size: 1.1rem;
             font-weight: 600;
             border-radius: 50px;
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-            margin-top: 20px;
             min-width: 200px;
+            flex: 1;
+            max-width: 280px;
         }
 
         .convert-btn:hover {
@@ -175,6 +184,53 @@
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
+        }
+
+        .single-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.3);
+        }
+
+        .single-btn:hover:not(:disabled) {
+            box-shadow: 0 12px 25px rgba(40, 167, 69, 0.4);
+        }
+
+        .multiple-btn {
+            background: linear-gradient(135deg, #fd7e14 0%, #e83e8c 100%);
+            box-shadow: 0 8px 20px rgba(253, 126, 20, 0.3);
+        }
+
+        .file-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .control-btn.add-more {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+        }
+
+        .control-btn.add-more:hover {
+            background: linear-gradient(135deg, #138496, #117a8b);
         }
 
         .status {
@@ -255,25 +311,35 @@
             font-weight: 500;
         }
 
-        @media (max-width: 768px) {
-            .container {
-                padding: 30px 20px;
-                margin: 10px;
-            }
+            @media (max-width: 768px) {
+                .container {
+                    padding: 30px 20px;
+                    margin: 10px;
+                }
 
-            h1 {
-                font-size: 2rem;
-            }
+                h1 {
+                    font-size: 2rem;
+                }
 
-            .upload-area {
-                padding: 30px 15px;
-            }
+                .upload-area {
+                    padding: 30px 15px;
+                }
 
-            .features {
-                grid-template-columns: 1fr;
-                gap: 15px;
+                .button-container {
+                    flex-direction: column;
+                    gap: 10px;
+                }
+
+                .convert-btn {
+                    max-width: none;
+                    width: 100%;
+                }
+
+                .features {
+                    grid-template-columns: 1fr;
+                    gap: 15px;
+                }
             }
-        }
     </style>
 </head>
 <body>
@@ -284,16 +350,30 @@
         <div class="upload-area" onclick="document.getElementById('fileInput').click()">
             <div class="upload-icon">📁</div>
             <div class="upload-text">Drop images here or click to browse</div>
-            <div class="upload-hint">Support JPG, PNG, GIF • Multiple files allowed</div>
+            <div class="upload-hint">Support JPG, PNG, GIF • Multiple files allowed • Add more anytime</div>
         </div>
         
         <input type="file" id="fileInput" multiple accept="image/*">
         
+        <div class="file-controls">
+            <button class="control-btn" onclick="clearAllFiles()" id="clearAllBtn" style="display: none;">
+                🗑️ Clear All
+            </button>
+            <button class="control-btn add-more" onclick="document.getElementById('fileInput').click()" id="addMoreBtn" style="display: none;">
+                ➕ Add More Images
+            </button>
+        </div>
+        
         <div id="fileList" class="file-list"></div>
         
-        <button id="convertBtn" class="convert-btn" onclick="convertImages()" disabled>
-            🚀 Convert to Word Document
-        </button>
+        <div class="button-container">
+            <button id="convertSingleBtn" class="convert-btn single-btn" onclick="convertImages('single')" disabled>
+                📄 Convert as Single Document
+            </button>
+            <button id="convertMultipleBtn" class="convert-btn multiple-btn" onclick="convertImages('multiple')" disabled>
+                📚 Convert as Separate Documents
+            </button>
+        </div>
         
         <div class="progress-container" id="progressContainer">
             <div class="progress-bar">
@@ -353,10 +433,18 @@
         });
 
         function handleFiles(files) {
-            selectedFiles = [];
+            // Add new files to existing array instead of replacing
             for (let i = 0; i < files.length; i++) {
                 if (files[i].type.startsWith('image/')) {
-                    selectedFiles.push(files[i]);
+                    // Check if file is already added (by name and size to avoid duplicates)
+                    const isDuplicate = selectedFiles.some(existingFile => 
+                        existingFile.name === files[i].name && 
+                        existingFile.size === files[i].size
+                    );
+                    
+                    if (!isDuplicate) {
+                        selectedFiles.push(files[i]);
+                    }
                 }
             }
             
@@ -366,11 +454,19 @@
 
         function updateFileList() {
             const fileList = document.getElementById('fileList');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            const addMoreBtn = document.getElementById('addMoreBtn');
             
             if (selectedFiles.length === 0) {
                 fileList.innerHTML = '';
+                clearAllBtn.style.display = 'none';
+                addMoreBtn.style.display = 'none';
                 return;
             }
+            
+            // Show control buttons when files are present
+            clearAllBtn.style.display = 'inline-block';
+            addMoreBtn.style.display = 'inline-block';
             
             fileList.innerHTML = selectedFiles.map((file, index) => `
                 <div class="file-item">
@@ -383,20 +479,47 @@
             `).join('');
         }
 
+        function clearAllFiles() {
+            selectedFiles = [];
+            updateFileList();
+            updateConvertButton();
+            
+            // Reset file input
+            document.getElementById('fileInput').value = '';
+        }
+
         function removeFile(index) {
             selectedFiles.splice(index, 1);
             updateFileList();
             updateConvertButton();
+            
+            // Clear file input if no files left
+            if (selectedFiles.length === 0) {
+                document.getElementById('fileInput').value = '';
+            }
         }
 
         function updateConvertButton() {
-            const convertBtn = document.getElementById('convertBtn');
-            convertBtn.disabled = selectedFiles.length === 0;
+            const singleBtn = document.getElementById('convertSingleBtn');
+            const multipleBtn = document.getElementById('convertMultipleBtn');
+            const hasFiles = selectedFiles.length > 0;
             
-            if (selectedFiles.length > 0) {
-                convertBtn.textContent = `🚀 Convert ${selectedFiles.length} Image${selectedFiles.length > 1 ? 's' : ''}`;
+            singleBtn.disabled = !hasFiles;
+            multipleBtn.disabled = !hasFiles;
+            
+            if (hasFiles) {
+                if (selectedFiles.length === 1) {
+                    singleBtn.textContent = `📄 Convert 1 Image`;
+                    multipleBtn.style.display = 'none';
+                } else {
+                    singleBtn.textContent = `📄 Merge ${selectedFiles.length} Images`;
+                    multipleBtn.textContent = `📚 ${selectedFiles.length} Separate Documents`;
+                    multipleBtn.style.display = 'block';
+                }
             } else {
-                convertBtn.textContent = '🚀 Convert to Word Document';
+                singleBtn.textContent = '📄 Convert as Single Document';
+                multipleBtn.textContent = '📚 Convert as Separate Documents';
+                multipleBtn.style.display = 'block';
             }
         }
 
@@ -433,19 +556,32 @@
             document.getElementById('progressText').textContent = text;
         }
 
-        async function convertImages() {
+        async function convertImages(mode = 'single') {
             if (selectedFiles.length === 0) return;
             
-            const convertBtn = document.getElementById('convertBtn');
-            convertBtn.disabled = true;
-            convertBtn.textContent = '⏳ Processing...';
+            const singleBtn = document.getElementById('convertSingleBtn');
+            const multipleBtn = document.getElementById('convertMultipleBtn');
             
+            // Disable both buttons
+            singleBtn.disabled = true;
+            multipleBtn.disabled = true;
+            
+            if (mode === 'single') {
+                singleBtn.textContent = '⏳ Processing...';
+                await processSingleDocument();
+            } else {
+                multipleBtn.textContent = '⏳ Processing...';
+                await processMultipleDocuments();
+            }
+        }
+
+        async function processSingleDocument() {
             hideStatus();
             showProgress();
             updateProgress(10, 'Uploading images...');
             
             try {
-                // Step 1: Upload images
+                // Upload all images as one batch
                 const formData = new FormData();
                 selectedFiles.forEach((file, index) => {
                     formData.append(`file_${index}`, file);
@@ -467,10 +603,10 @@
                 updateProgress(50, 'Processing with AI OCR...');
                 showStatus(`✅ Uploaded ${uploadResult.filesCount} images successfully`, 'success');
                 
-                // Step 2: Process images
+                // Process all images into one document
                 setTimeout(async () => {
                     try {
-                        updateProgress(75, 'Generating Word document...');
+                        updateProgress(75, 'Generating single Word document...');
                         
                         const processResponse = await fetch(`/api/process?batchId=${currentBatchId}`, {
                             method: 'GET'
@@ -483,44 +619,155 @@
                         
                         updateProgress(95, 'Preparing download...');
                         
-                        // Download the Word document
+                        // Download the single Word document
                         const blob = await processResponse.blob();
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `extracted_document_${currentBatchId}.docx`;
+                        a.download = `merged_document_${currentBatchId}.docx`;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
                         
                         updateProgress(100, 'Complete!');
-                        showStatus('🎉 Document generated and downloaded successfully!', 'success');
-                        
-                        // Reset after success
-                        setTimeout(() => {
-                            selectedFiles = [];
-                            updateFileList();
-                            updateConvertButton();
-                            showProgress(false);
-                            convertBtn.disabled = false;
-                            convertBtn.textContent = '🚀 Convert to Word Document';
-                        }, 3000);
+                        showStatus('🎉 Single document with all images generated successfully!', 'success');
+                        resetAfterSuccess();
                         
                     } catch (processError) {
                         throw processError;
                     }
-                }, 2000); // Small delay to show upload success
+                }, 2000);
                 
             } catch (error) {
-                console.error('Conversion error:', error);
-                showStatus(`❌ Error: ${error.message}`, 'error');
+                handleConversionError(error);
+            }
+        }
+
+        async function processMultipleDocuments() {
+            hideStatus();
+            showProgress();
+            
+            try {
+                const totalFiles = selectedFiles.length;
+                let completedFiles = 0;
+                const downloadLinks = [];
+                
+                updateProgress(5, `Processing ${totalFiles} images separately...`);
+                showStatus(`🚀 Starting individual processing of ${totalFiles} images`, 'info');
+                
+                // Process each image separately
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    const file = selectedFiles[i];
+                    const progressPercent = Math.round((i / totalFiles) * 80) + 10;
+                    
+                    updateProgress(progressPercent, `Processing image ${i + 1} of ${totalFiles}: ${file.name}`);
+                    
+                    // Upload single image
+                    const formData = new FormData();
+                    formData.append('file_0', file);
+                    
+                    const uploadResponse = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!uploadResponse.ok) {
+                        const errorData = await uploadResponse.json();
+                        throw new Error(`Failed to upload ${file.name}: ${errorData.error}`);
+                    }
+                    
+                    const uploadResult = await uploadResponse.json();
+                    const batchId = uploadResult.batchId;
+                    
+                    // Small delay to ensure upload is complete
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Process single image
+                    const processResponse = await fetch(`/api/process?batchId=${batchId}`, {
+                        method: 'GET'
+                    });
+                    
+                    if (!processResponse.ok) {
+                        const errorData = await processResponse.json();
+                        console.warn(`Failed to process ${file.name}:`, errorData.error);
+                        continue; // Skip this file and continue with others
+                    }
+                    
+                    // Store the blob for download
+                    const blob = await processResponse.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const fileName = file.name.replace(/\.[^/.]+$/, ''); // Remove extension
+                    
+                    downloadLinks.push({
+                        url: url,
+                        filename: `${fileName}_${batchId}.docx`
+                    });
+                    
+                    completedFiles++;
+                }
+                
+                updateProgress(95, `Preparing ${completedFiles} documents for download...`);
+                
+                // Download all documents
+                if (downloadLinks.length > 0) {
+                    for (let i = 0; i < downloadLinks.length; i++) {
+                        const link = downloadLinks[i];
+                        const a = document.createElement('a');
+                        a.href = link.url;
+                        a.download = link.filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        
+                        // Small delay between downloads
+                        if (i < downloadLinks.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+                    }
+                    
+                    // Cleanup URLs
+                    downloadLinks.forEach(link => window.URL.revokeObjectURL(link.url));
+                    
+                    updateProgress(100, 'All documents downloaded!');
+                    showStatus(`🎉 Successfully generated ${completedFiles} separate Word documents!`, 'success');
+                } else {
+                    throw new Error('No documents were successfully processed');
+                }
+                
+                resetAfterSuccess();
+                
+            } catch (error) {
+                handleConversionError(error);
+            }
+        }
+
+        function handleConversionError(error) {
+            console.error('Conversion error:', error);
+            showStatus(`❌ Error: ${error.message}`, 'error');
+            showProgress(false);
+            
+            // Reset buttons
+            const singleBtn = document.getElementById('convertSingleBtn');
+            const multipleBtn = document.getElementById('convertMultipleBtn');
+            singleBtn.disabled = false;
+            multipleBtn.disabled = false;
+            updateConvertButton();
+        }
+
+        function resetAfterSuccess() {
+            setTimeout(() => {
+                selectedFiles = [];
+                document.getElementById('fileInput').value = ''; // Clear file input
+                updateFileList();
+                updateConvertButton();
                 showProgress(false);
                 
-                // Reset button
-                convertBtn.disabled = false;
-                updateConvertButton();
-            }
+                const singleBtn = document.getElementById('convertSingleBtn');
+                const multipleBtn = document.getElementById('convertMultipleBtn');
+                singleBtn.disabled = false;
+                multipleBtn.disabled = false;
+            }, 3000);
         }
 
         // Initialize
