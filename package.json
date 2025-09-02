@@ -4,7 +4,8 @@
   "description": "Convert images to Word documents using AI OCR",
   "scripts": {
     "dev": "vercel dev",
-    "build": "npm install"
+    "build": "npm install",
+    "start": "node server.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.7.1",
@@ -14,5 +15,17 @@
   },
   "engines": {
     "node": "18.x"
-  }
+  },
+  "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yashrajsinhjadej/word_to_text.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/yashrajsinhjadej/word_to_text/issues"
+  },
+  "homepage": "https://github.com/yashrajsinhjadej/word_to_text#readme"
 }
