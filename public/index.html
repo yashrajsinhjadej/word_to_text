@@ -3,357 +3,528 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Debugger</title>
+    <title>Image to Word Converter</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
         .container {
             background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            animation: rotate 20s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            background: rgba(102, 126, 234, 0.05);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: rgba(118, 75, 162, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .upload-area.dragover {
+            border-color: #28a745;
+            background: rgba(40, 167, 69, 0.1);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #667eea;
             margin-bottom: 20px;
         }
-        .button {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 5px;
+
+        .upload-text {
+            color: #555;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
         }
-        .button:hover {
-            background: #0056b3;
+
+        .upload-hint {
+            color: #888;
+            font-size: 0.9rem;
         }
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        .success {
-            background: #d4edda;
-            color: #155724;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        .log-container {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 10px 0;
-            max-height: 400px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        input[type="text"] {
-            width: 300px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin: 5px;
-        }
-        .tab-container {
-            display: flex;
-            border-bottom: 1px solid #ddd;
-            margin-bottom: 20px;
-        }
-        .tab {
-            padding: 10px 20px;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-        }
-        .tab.active {
-            border-bottom-color: #007bff;
-            background: #f8f9fa;
-        }
-        .tab-content {
+
+        #fileInput {
             display: none;
         }
-        .tab-content.active {
-            display: block;
+
+        .file-list {
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .file-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #667eea;
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .file-size {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .remove-file {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+        }
+
+        .remove-file:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+
+        .convert-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            margin-top: 20px;
+            min-width: 200px;
+        }
+
+        .convert-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .convert-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #cce7ff;
+            color: #0c5460;
+            border: 1px solid #b3d9ff;
+        }
+
+        .progress-container {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 50px;
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            border-radius: 50px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+        }
+
+        .feature {
+            text-align: center;
+            padding: 10px;
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .feature-text {
+            color: #555;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .upload-area {
+                padding: 30px 15px;
+            }
+
+            .features {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>🔧 API Debugger</h1>
-    
-    <div class="tab-container">
-        <div class="tab active" onclick="switchTab('health')">Health Check</div>
-        <div class="tab" onclick="switchTab('process')">Process API Test</div>
-        <div class="tab" onclick="switchTab('upload')">Upload Test</div>
-    </div>
-
-    <!-- Health Check Tab -->
-    <div id="health" class="tab-content active">
-        <div class="container">
-            <h2>🏥 Health Check</h2>
-            <p>Test if your APIs are reachable and configured properly:</p>
-            <button class="button" onclick="testHealth()">Test Health</button>
-            <button class="button" onclick="testProcessEndpoint()">Test Process Endpoint</button>
-            <div id="health-result"></div>
-        </div>
-    </div>
-
-    <!-- Process API Test Tab -->
-    <div id="process" class="tab-content">
-        <div class="container">
-            <h2>⚙️ Process API Test</h2>
-            <p>Test the process API with your batch ID:</p>
-            <input type="text" id="batchId" placeholder="Enter Batch ID (e.g., 1756568682237)" value="1756568682237">
-            <button class="button" onclick="testProcess()">Test Process API</button>
-            <div id="process-result"></div>
-        </div>
-    </div>
-
-    <!-- Upload Test Tab -->
-    <div id="upload" class="tab-content">
-        <div class="container">
-            <h2>📤 Upload Test</h2>
-            <p>Test file upload functionality:</p>
-            <input type="file" id="fileInput" multiple accept="image/*">
-            <button class="button" onclick="testUpload()">Test Upload</button>
-            <div id="upload-result"></div>
-        </div>
-    </div>
-
     <div class="container">
-        <h3>📋 Debug Logs</h3>
-        <button class="button" onclick="clearLogs()">Clear Logs</button>
-        <div id="logs" class="log-container"></div>
+        <h1>📄 Image to Word Converter</h1>
+        <p class="subtitle">Convert your images to editable Word documents using AI-powered OCR</p>
+        
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">Drop images here or click to browse</div>
+            <div class="upload-hint">Support JPG, PNG, GIF • Multiple files allowed</div>
+        </div>
+        
+        <input type="file" id="fileInput" multiple accept="image/*">
+        
+        <div id="fileList" class="file-list"></div>
+        
+        <button id="convertBtn" class="convert-btn" onclick="convertImages()" disabled>
+            🚀 Convert to Word Document
+        </button>
+        
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">Processing images...</div>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🤖</div>
+                <div class="feature-text">AI-Powered OCR</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <div class="feature-text">Fast Processing</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <div class="feature-text">Mobile Friendly</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <div class="feature-text">Secure & Private</div>
+            </div>
+        </div>
     </div>
 
     <script>
-        function log(message, type = 'info') {
-            const timestamp = new Date().toISOString();
-            const logElement = document.getElementById('logs');
-            const colorMap = {
-                'info': '#333',
-                'success': '#28a745',
-                'error': '#dc3545',
-                'warning': '#ffc107'
-            };
-            
-            logElement.innerHTML += `<div style="color: ${colorMap[type]}; margin: 2px 0;">
-                [${timestamp}] ${message}
-            </div>`;
-            logElement.scrollTop = logElement.scrollHeight;
-        }
+        let selectedFiles = [];
+        let currentBatchId = null;
 
-        function clearLogs() {
-            document.getElementById('logs').innerHTML = '';
-        }
+        // File input change handler
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            handleFiles(e.target.files);
+        });
 
-        function switchTab(tabName) {
-            // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-            
-            // Remove active class from all tabs
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            // Show selected tab content
-            document.getElementById(tabName).classList.add('active');
-            
-            // Add active class to clicked tab
-            event.target.classList.add('active');
-        }
+        // Drag and drop handlers
+        const uploadArea = document.querySelector('.upload-area');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
 
-        async function testHealth() {
-            log('Testing health endpoint...', 'info');
-            const resultDiv = document.getElementById('health-result');
-            
-            try {
-                const response = await fetch('/api/health', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                log(`Health check response status: ${response.status}`, 'info');
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    log('Health check successful', 'success');
-                    resultDiv.innerHTML = `<div class="success">✅ Health Check Passed<br>
-                        MongoDB: ${data.mongodb ? '✅' : '❌'}<br>
-                        Google API: ${data.google_api ? '✅' : '❌'}<br>
-                        Timestamp: ${data.timestamp}</div>`;
-                } else {
-                    const errorText = await response.text();
-                    log(`Health check failed: ${errorText}`, 'error');
-                    resultDiv.innerHTML = `<div class="error">❌ Health Check Failed<br>${errorText}</div>`;
+        function handleFiles(files) {
+            selectedFiles = [];
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].type.startsWith('image/')) {
+                    selectedFiles.push(files[i]);
                 }
-            } catch (error) {
-                log(`Health check error: ${error.message}`, 'error');
-                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
             }
+            
+            updateFileList();
+            updateConvertButton();
         }
 
-        async function testProcessEndpoint() {
-            log('Testing process endpoint accessibility...', 'info');
-            const resultDiv = document.getElementById('health-result');
+        function updateFileList() {
+            const fileList = document.getElementById('fileList');
             
-            try {
-                // Test with a dummy batch ID to see if endpoint responds
-                const response = await fetch('/api/process?batchId=test', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                log(`Process endpoint response status: ${response.status}`, 'info');
-                
-                const responseText = await response.text();
-                log(`Process endpoint response preview: ${responseText.substring(0, 100)}...`, 'info');
-                
-                try {
-                    const data = JSON.parse(responseText);
-                    resultDiv.innerHTML += `<div class="success">✅ Process Endpoint Accessible<br>
-                        Status: ${response.status}<br>
-                        Response: ${JSON.stringify(data, null, 2)}</div>`;
-                } catch (parseError) {
-                    log('Process endpoint returned non-JSON response', 'warning');
-                    resultDiv.innerHTML += `<div class="error">⚠️ Process endpoint returned HTML/non-JSON:<br>
-                        <pre>${responseText.substring(0, 200)}...</pre></div>`;
-                }
-            } catch (error) {
-                log(`Process endpoint test error: ${error.message}`, 'error');
-                resultDiv.innerHTML += `<div class="error">❌ Process Endpoint Error: ${error.message}</div>`;
-            }
-        }
-
-        async function testProcess() {
-            const batchId = document.getElementById('batchId').value.trim();
-            const resultDiv = document.getElementById('process-result');
-            
-            if (!batchId) {
-                resultDiv.innerHTML = '<div class="error">❌ Please enter a batch ID</div>';
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '';
                 return;
             }
+            
+            fileList.innerHTML = selectedFiles.map((file, index) => `
+                <div class="file-item">
+                    <div>
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${formatFileSize(file.size)}</div>
+                    </div>
+                    <button class="remove-file" onclick="removeFile(${index})" title="Remove file">×</button>
+                </div>
+            `).join('');
+        }
 
-            log(`Testing process API with batchId: ${batchId}`, 'info');
-            resultDiv.innerHTML = '<div>🔄 Processing... This may take a while.</div>';
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+            updateConvertButton();
+        }
 
+        function updateConvertButton() {
+            const convertBtn = document.getElementById('convertBtn');
+            convertBtn.disabled = selectedFiles.length === 0;
+            
+            if (selectedFiles.length > 0) {
+                convertBtn.textContent = `🚀 Convert ${selectedFiles.length} Image${selectedFiles.length > 1 ? 's' : ''}`;
+            } else {
+                convertBtn.textContent = '🚀 Convert to Word Document';
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+
+        function hideStatus() {
+            document.getElementById('status').style.display = 'none';
+        }
+
+        function showProgress(show = true) {
+            const progressContainer = document.getElementById('progressContainer');
+            progressContainer.style.display = show ? 'block' : 'none';
+            
+            if (!show) {
+                document.getElementById('progressFill').style.width = '0%';
+            }
+        }
+
+        function updateProgress(percent, text) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = text;
+        }
+
+        async function convertImages() {
+            if (selectedFiles.length === 0) return;
+            
+            const convertBtn = document.getElementById('convertBtn');
+            convertBtn.disabled = true;
+            convertBtn.textContent = '⏳ Processing...';
+            
+            hideStatus();
+            showProgress();
+            updateProgress(10, 'Uploading images...');
+            
             try {
-                const response = await fetch(`/api/process?batchId=${encodeURIComponent(batchId)}`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json, application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                    }
+                // Step 1: Upload images
+                const formData = new FormData();
+                selectedFiles.forEach((file, index) => {
+                    formData.append(`file_${index}`, file);
                 });
-
-                log(`Process API response status: ${response.status}`, 'info');
-                log(`Process API response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'info');
-
-                if (response.ok) {
-                    const contentType = response.headers.get('content-type');
-                    
-                    if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-                        // It's a Word document
-                        const blob = await response.blob();
+                
+                const uploadResponse = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!uploadResponse.ok) {
+                    const errorData = await uploadResponse.json();
+                    throw new Error(errorData.error || 'Upload failed');
+                }
+                
+                const uploadResult = await uploadResponse.json();
+                currentBatchId = uploadResult.batchId;
+                
+                updateProgress(50, 'Processing with AI OCR...');
+                showStatus(`✅ Uploaded ${uploadResult.filesCount} images successfully`, 'success');
+                
+                // Step 2: Process images
+                setTimeout(async () => {
+                    try {
+                        updateProgress(75, 'Generating Word document...');
+                        
+                        const processResponse = await fetch(`/api/process?batchId=${currentBatchId}`, {
+                            method: 'GET'
+                        });
+                        
+                        if (!processResponse.ok) {
+                            const errorData = await processResponse.json();
+                            throw new Error(errorData.error || 'Processing failed');
+                        }
+                        
+                        updateProgress(95, 'Preparing download...');
+                        
+                        // Download the Word document
+                        const blob = await processResponse.blob();
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `extracted_document_${batchId}.docx`;
+                        a.download = `extracted_document_${currentBatchId}.docx`;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
                         
-                        log('Document downloaded successfully', 'success');
-                        resultDiv.innerHTML = '<div class="success">✅ Document processed and downloaded successfully!</div>';
-                    } else {
-                        // Try to parse as JSON
-                        const responseText = await response.text();
-                        try {
-                            const data = JSON.parse(responseText);
-                            log('Process API returned JSON response', 'success');
-                            resultDiv.innerHTML = `<div class="success">✅ Response: ${JSON.stringify(data, null, 2)}</div>`;
-                        } catch (parseError) {
-                            log('Process API returned non-JSON response', 'error');
-                            resultDiv.innerHTML = `<div class="error">❌ Unexpected response format:<br><pre>${responseText.substring(0, 500)}...</pre></div>`;
-                        }
+                        updateProgress(100, 'Complete!');
+                        showStatus('🎉 Document generated and downloaded successfully!', 'success');
+                        
+                        // Reset after success
+                        setTimeout(() => {
+                            selectedFiles = [];
+                            updateFileList();
+                            updateConvertButton();
+                            showProgress(false);
+                            convertBtn.disabled = false;
+                            convertBtn.textContent = '🚀 Convert to Word Document';
+                        }, 3000);
+                        
+                    } catch (processError) {
+                        throw processError;
                     }
-                } else {
-                    const errorText = await response.text();
-                    log(`Process API error: ${errorText}`, 'error');
-                    
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        resultDiv.innerHTML = `<div class="error">❌ API Error (${response.status}):<br>${errorData.error}<br>Details: ${errorData.details || 'None'}</div>`;
-                    } catch (parseError) {
-                        resultDiv.innerHTML = `<div class="error">❌ API Error (${response.status}):<br><pre>${errorText}</pre></div>`;
-                    }
-                }
+                }, 2000); // Small delay to show upload success
+                
             } catch (error) {
-                log(`Process API network error: ${error.message}`, 'error');
-                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+                console.error('Conversion error:', error);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                showProgress(false);
+                
+                // Reset button
+                convertBtn.disabled = false;
+                updateConvertButton();
             }
         }
 
-        async function testUpload() {
-            const fileInput = document.getElementById('fileInput');
-            const resultDiv = document.getElementById('upload-result');
-            
-            if (!fileInput.files.length) {
-                resultDiv.innerHTML = '<div class="error">❌ Please select files to upload</div>';
-                return;
-            }
-
-            log(`Testing upload with ${fileInput.files.length} files`, 'info');
-            resultDiv.innerHTML = '<div>🔄 Uploading files...</div>';
-
-            try {
-                const formData = new FormData();
-                for (let i = 0; i < fileInput.files.length; i++) {
-                    formData.append('files', fileInput.files[i]);
-                }
-
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                log(`Upload response status: ${response.status}`, 'info');
-
-                if (response.ok) {
-                    const data = await response.json();
-                    log('Upload successful', 'success');
-                    resultDiv.innerHTML = `<div class="success">✅ Upload Successful<br>
-                        Batch ID: ${data.batchId}<br>
-                        Files: ${data.filesCount}</div>`;
-                    
-                    // Auto-fill the batch ID in process tab
-                    document.getElementById('batchId').value = data.batchId;
-                } else {
-                    const errorText = await response.text();
-                    log(`Upload failed: ${errorText}`, 'error');
-                    resultDiv.innerHTML = `<div class="error">❌ Upload Failed:<br><pre>${errorText}</pre></div>`;
-                }
-            } catch (error) {
-                log(`Upload network error: ${error.message}`, 'error');
-                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
-            }
-        }
-
-        // Log initial page load
-        log('Debug page loaded', 'info');
+        // Initialize
+        updateConvertButton();
     </script>
 </body>
 </html>
