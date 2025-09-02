@@ -9,17 +9,17 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Import your API handlers
-const uploadHandler = require('./api/upload');
-const processHandler = require('./api/process');
+// Import your API handlers (now CommonJS)
+const { handler: uploadHandler } = require('./api/upload');
+const { handler: processHandler } = require('./api/process');
 
-// Convert Vercel handlers to Express routes
+// Convert handlers to Express routes
 app.post('/api/upload', (req, res) => {
-  uploadHandler.default(req, res);
+  uploadHandler(req, res);
 });
 
 app.get('/api/process', (req, res) => {
-  processHandler.default(req, res);
+  processHandler(req, res);
 });
 
 // Serve index.html for root route

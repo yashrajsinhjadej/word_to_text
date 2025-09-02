@@ -56,7 +56,7 @@ function loadDocxModule() {
   }
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   console.log(`[${new Date().toISOString()}] Request received: ${req.method} ${req.url}`);
   
   // Add CORS headers
@@ -369,9 +369,5 @@ export default async function handler(req, res) {
   }
 }
 
-export const config = {
-  api: {
-    bodyParser: false,
-    externalResolver: true,
-  },
-};
+// Export for CommonJS (Node.js/Express)
+module.exports = { handler };

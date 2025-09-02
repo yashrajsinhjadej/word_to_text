@@ -13,7 +13,7 @@ async function connectToDatabase() {
   return client;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -151,8 +151,5 @@ function parseFilePart(part) {
   };
 }
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// Export for CommonJS (Node.js/Express)
+module.exports = { handler };
