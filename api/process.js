@@ -319,14 +319,10 @@ async function handler(req, res) {
     console.log('[PROCESS] 🔄 Generating document buffer...');
     const buffer = await Packer.toBuffer(doc);
     console.log(`[PROCESS] ✅ Document buffer created, size: ${buffer.length} bytes`);
-    
-    // Mark images as processed
-    console.log('[PROCESS] 🏷️ Marking images as processed...');
-    const updateResult = await collection.updateMany(
-      { batchId: batchId },
-      { $set: { processed: true, processedAt: new Date() } }
-    );
-    console.log(`[PROCESS] ✅ Updated ${updateResult.modifiedCount} documents as processed`);
+    //deleting the images as not needed requires too much storage
+    const deleteResult = await collection.deleteMany({ batchId: batchId });
+    console.log(`[PROCESS] 🗑️ Deleted ${deleteResult.deletedCount} images from storage`);
+
 
     // Return Word document
     res.setHeader('Content-Disposition', `attachment; filename=extracted_document_${batchId}.docx`);
@@ -338,19 +334,7 @@ async function handler(req, res) {
 
     console.log('[PROCESS] ✅ Process completed successfully');
 
-    // Clean up old processed images (older than 1 hour) - do this async
-    setTimeout(async () => {
-      try {
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        const deleteResult = await collection.deleteMany({
-          processed: true,
-          processedAt: { $lt: oneHourAgo }
-        });
-        console.log(`[CLEANUP] 🧹 Deleted ${deleteResult.deletedCount} old processed images`);
-      } catch (cleanupError) {
-        console.error('[CLEANUP] Error during cleanup:', cleanupError);
-      }
-    }, 1000);
+ 
 
   } catch (err) {
     console.error("[ERROR] 💥 Detailed error:", err);
